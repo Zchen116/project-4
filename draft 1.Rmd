@@ -1,0 +1,142 @@
+---
+title: "Untitled"
+output: html_document
+---
+```{r}
+library(wordcloud)
+library(tidytext)
+library(tidyverse)
+library(caret)
+library(SnowballC)
+library(tm)
+library(e1071)
+```
+#Load data
+```{r}
+spam <- 'C:\\Users\\HR\\Desktop\\data 607\\project 4\\spam_2\\'
+ham <- 'C:\\Users\\HR\\Desktop\\data 607\\project 4\\easy_ham\\'
+```
+#Create data frame for Ham and Spam
+```{r}
+ham.files <- list.files(ham)
+spam.files <- list.files(spam)
+```
+#List documents of Ham
+```{r}
+ham_docs_list <- NA
+for(i in 1:length(ham.files))
+{
+  filepath<-paste0(ham, "/", ham.files[1])  
+  text <-readLines(filepath)
+  list1<- list(paste(text, collapse="\n"))
+  ham_docs_list = c(ham_docs_list,list1)
+}
+```
+
+```{r}
+hamDF <-as.data.frame(unlist(ham_docs_list),stringsAsFactors = FALSE)
+hamDF$type <- "ham"
+colnames(hamDF) <- c("text","type")
+nrow(hamDF)
+```
+#List documents of Spam
+```{r}
+spam_docs_list <- NA
+for(i in 1:length(spam.files))
+{
+  filepath<-paste0(spam, "/", spam.files[1])
+  text <- readLines(filepath)
+  list1<- list(paste(text, collapse = "\n"))
+  spam_docs_list = c(spam_docs_list,list1)
+}
+```
+
+```{r}
+spamDF <-as.data.frame(unlist(spam_docs_list), stringsAsFactors = FALSE)
+spamDF$type <- "spam"
+colnames(spamDF) <- c("text", "type")
+nrow(spamDF)
+```
+
+```{r}
+ham_spam_DF <- rbind(hamDF, spamDF)
+```
+
+#Prepare Corpus
+```{r}
+ham.corpus <- VCorpus(VectorSource(hamDF$text))
+spam.corpus <- VCorpus(VectorSource(spamDF$text))
+corpus <- c(ham.corpus,spam.corpus)
+```
+#Remove Numbers
+#Remove Punctuation
+#Remove Word
+```{r}
+emailCorpus <- Corpus(VectorSource(corpus$text))
+cleanCorpus <- tm_map(emailCorpus, removeNumbers)
+cleanCorpus <- tm_map(cleanCorpus, removePunctuation)
+cleanCorpus <- tm_map(cleanCorpus, removeWords, stopwords())
+cleanCorpus <- tm_map(cleanCorpus, stripWhitespace)
+```
+#Create document Term Matrix
+```{r}
+spam_indices <- which(ham_spam_DF$type == "spam")
+wordcloud(corpus[spam_indices], max.words = 75, random.order = FALSE, random.color = TRUE,colors=palette())
+```
+
+```{r}
+ham_indices <- which(ham_spam_DF$type == "ham")
+wordcloud(corpus[ham_indices], max.words = 75, random.order = FALSE, random.color = TRUE,colors=palette())
+```
+
+#Prepare test and train data
+```{r}
+set.seed(100)
+sample_size <- floor(0.70 * nrow(ham_spam_DF))
+train_idx <- sample(seq_len(nrow(ham_spam_DF)), size = sample_size)
+```
+
+```{r}
+training_df <- ham_spam_DF[train_idx, ]
+testing_df <- ham_spam_DF[-train_idx, ]
+```
+
+```{r}
+training_corp <- Corpus(VectorSource(training_df$text))
+testing_corp <- Corpus(VectorSource(testing_df$text))
+training_dtm <- DocumentTermMatrix(training_corp)
+testing_dtm <- DocumentTermMatrix(testing_corp)
+```
+
+```{r}
+counter <- function(x) {
+  y <- ifelse(x > 0, 1,0)
+  y <- factor(y, levels=c(0,1), labels=c("No", "Yes"))
+  y
+}
+
+train_sms <- apply(training_dtm, 2, counter)
+test_sms <- apply(testing_dtm, 2, counter)
+```
+#Predict using test data
+```{r}
+classifier <- naiveBayes(train_sms, factor(training_df$type))
+```
+
+```{r}
+predict_test <- predict(classifier, newdata=test_sms)
+
+table(predict_test, testing_df$type)
+```
+
+
+
+
+
+
+
+
+
+
+
+
